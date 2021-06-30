@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cinttypes>
 #include <chrono>
+#include <bitset>
 
 #define BLOCK_SIZE 64
 
@@ -30,12 +31,12 @@ __global__ void akf(uint64_t start_offset, uint64_t end, uint64_t *min_amplitude
 
         akf[idx] = (out >= 0) ? out : 0 - out;
         if (idx != 0) {
-            atomicMax(&amplitude, akf[idx]);
+            atomicMax(reinterpret_cast<unsigned long long int*>(&amplitude), (unsigned long long)akf[idx]);
         }
         __syncthreads();
 
         if (idx == 0) {
-            uint64_t old = atomicMin(min_amplitude, amplitude);
+            uint64_t old = atomicMin(reinterpret_cast<unsigned long long int*>(min_amplitude), (unsigned long long)amplitude);
             if (old >= amplitude) {
                 *signal = val;
             }
@@ -77,7 +78,7 @@ int main(int argc, char **argv) {
         printf("Cannot process less than 5 bits\n");
         return EXIT_FAILURE;
     }
-    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::high_resolution_clock::now();
+    auto start_time = std::chrono::high_resolution_clock::now();
     uint64_t *dev_amplitude;
     uint64_t *dev_signal;
     cudaMalloc((void**)&dev_amplitude, sizeof(uint64_t));
@@ -96,9 +97,8 @@ int main(int argc, char **argv) {
     }
     cudaMemcpy(&amplitude, dev_amplitude, sizeof(uint64_t), cudaMemcpyDeviceToHost);
     cudaMemcpy(&signal, dev_signal, sizeof(uint64_t), cudaMemcpyDeviceToHost);
-    char buf[66];
-    _ui64toa(signal, buf, 2);
-    printf("Best signal is %s (%llu) with amplitude of %llu\n", buf, signal, amplitude);
+    std::bitset<BLOCK_SIZE> s(signal);
+    printf("Best signal is %s (%llu) with amplitude of %llu\n", s.to_string().c_str(), signal, amplitude);
 
     auto *akf = new int8_t[n]();
     cpu_akf(signal, n, akf);
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
         printf("%d ", akf[i]);
     }
     printf("\n");
-    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::high_resolution_clock::now();
+    auto end_time = std::chrono::high_resolution_clock::now();
     printf("Calculation took %f seconds", (double)(std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count()) / 1e+6);
     return 0;
 }
