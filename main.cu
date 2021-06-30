@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
 
     uint64_t blocks = (1ULL << n) - 1ULL;
     uint64_t start = 0b1ULL << (n - 1);
-    akf<<<2048, n>>>(start, blocks, dev_amplitude, dev_signal, n);
+    akf<<<3072, n>>>(start, blocks, dev_amplitude, dev_signal, n);
     cudaError_t cudaError = cudaGetLastError();
     if(cudaError != cudaSuccess) {
         printf("Could not execute CUDA kernel: %s\n", cudaGetErrorString(cudaError));
